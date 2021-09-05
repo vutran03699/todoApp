@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/loading.dart';
+import 'package:todo_app/services/database_services.dart';
+
+import 'model/todo.dart';
 
 //stl
 class TodoList extends StatefulWidget {
@@ -8,66 +12,77 @@ class TodoList extends StatefulWidget {
 }
 
 class _TodoListState extends State<TodoList> {
+  var backgroundApp = 'white';
+  
   bool isComplet = false;
   TextEditingController todoTitleController = TextEditingController();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body:SafeArea(
-        child:Padding(
-          padding:EdgeInsets.all(25),
-          child:Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("All todos",style: TextStyle(
-              color: Colors.white,
-              fontSize:30,
-              fontWeight:FontWeight.bold),
-            ),
-            Divider(),
-            SizedBox(height: 20),
-            ListView.separated(
-              separatorBuilder: (context,index) => Divider(color : Colors.grey[800]),
-              shrinkWrap: true,
-              itemCount:5,
-              itemBuilder: (context,index){
-                return Dismissible (
-                key:Key(index.toString()),
-                background: Container(
-                  padding: EdgeInsets.only(left:20),
-                  alignment: Alignment.centerLeft,
-                  child:Icon(Icons.delete),
-                  color:Colors.red,
+        child:StreamBuilder<List<Todo>>(
+          stream: DatabaseService().listTodos(),
+          builder: (context, snapshot) {
+            if(!snapshot.hasData){
+              return Loading();
+            }
+            // print(snapshot.data![0].title);
+            List<Todo>? todos = snapshot.data;
+            return Padding(
+              padding:EdgeInsets.all(25),
+              child:Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("All todos",style: TextStyle(
+                  color: Colors.white,
+                  fontSize:30,
+                  fontWeight:FontWeight.bold),
                 ),
-                onDismissed: (direction){
-                  print(direction);
-                },
-              child: ListTile(
-              // return ListTile(
-                onTap: (){
-                  setState((){
-                    isComplet = !isComplet;
-                  });
-                },
-                leading: Container(
-                  padding:EdgeInsets.all(2),
-                  height:30,
-                  width:30,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor,
-                    shape: BoxShape.circle
-                  ),
-                  child: isComplet ? Icon(Icons.check,color : Colors.white) : Container(),
-                ),
-                title: Text("Todo title",
-                style:TextStyle(
-                  fontSize:20, 
-                  fontWeight:FontWeight.w600,
-                  color:Colors.grey[200]
-                  )),
-              ));
-            }),
-          ]),
+                Divider(),
+                SizedBox(height: 20),
+                ListView.separated(
+                  separatorBuilder: (context,index) => Divider(color : Colors.grey[800]),
+                  shrinkWrap: true,
+                  itemCount:todos!.length,
+                  itemBuilder: (context,index){
+                    return Dismissible (
+                    key:Key(todos![index].title),
+                    background: Container(
+                      padding: EdgeInsets.only(left:20),
+                      alignment: Alignment.centerLeft,
+                      child:Icon(Icons.delete),
+                      color:Colors.red,
+                    ),
+                    onDismissed: (direction) async{
+                     await DatabaseService().remoteTodo(todos![index].uid);
+                    },
+                  child: ListTile(
+                  // return ListTile(
+                    onTap: (){
+                    DatabaseService().completTask(todos![index].uid);
+                    },
+                    leading: Container(
+                      padding:EdgeInsets.all(2),
+                      height:30,
+                      width:30,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        shape: BoxShape.circle
+                      ),
+                      child: todos[index].isComplet ? Icon(Icons.check,color : Colors.white) : Container(),
+                    ),
+                    title: Text(todos![index].title,
+                    style:TextStyle(
+                      fontSize:20, 
+                      fontWeight:FontWeight.w600,
+                      color:Colors.grey[200],
+                      decoration:  todos[index].isComplet ? TextDecoration.lineThrough:null
+                      )),
+                  ));
+                }),
+              ]),
+            );
+          }
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -124,9 +139,11 @@ class _TodoListState extends State<TodoList> {
                   child: Text("Add"),
                   color: Theme.of(context).primaryColor,
                   textColor: Colors.white,
-                  onPressed: (){
+                  onPressed: ()async{
                     if(todoTitleController.text.isNotEmpty){
-                      print(todoTitleController.text);
+                     await DatabaseService().createNewTodo(todoTitleController.text.trim());
+                     todoTitleController.text = '';
+                     print(todoTitleController.text);
                       Navigator.pop(context);
                     }
                   }
